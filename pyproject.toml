@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ff-crm-mcp"
+version = "0.1.0"
+description = "Call a CRM MCP gateway from the command line, or register it as a stdio MCP server. Stdlib only."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Proprietary" }
+authors = [{ name = "Fintech Farm" }]
+keywords = ["mcp", "crm", "stdio", "streamable-http"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Environment :: Console",
+]
+dependencies = []
+
+[project.scripts]
+ff-crm-mcp = "ff_crm_mcp.cli:main"
+ff-crm-mcp-stdio = "ff_crm_mcp.stdio:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ff_crm_mcp"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "README.md", "pyproject.toml"]
