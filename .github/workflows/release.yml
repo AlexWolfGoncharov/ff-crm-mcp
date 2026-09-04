@@ -1,0 +1,25 @@
+name: release
+
+# Publishes to PyPI when a GitHub release is published, via Trusted Publishing —
+# no token stored anywhere. One-time setup on PyPI: add a trusted publisher for
+# this repo (owner AlexWolfGoncharov, repo ff-crm-mcp, workflow release.yml).
+on:
+  release:
+    types: [published]
+
+jobs:
+  pypi:
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write        # required for Trusted Publishing
+      contents: write        # to attach the built artifacts to the release
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv build
+      - name: Attach artifacts to the release
+        run: gh release upload "${GITHUB_REF_NAME}" dist/* --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - uses: pypa/gh-action-pypi-publish@release/v1

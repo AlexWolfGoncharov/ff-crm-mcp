@@ -1,12 +1,25 @@
 # ff-crm-mcp
 
-Two commands for a Fintech Farm CRM MCP gateway:
+Two commands for a CRM MCP gateway:
 
 - `ff-crm-mcp` — one-shot CLI: open an MCP session, run one tool, exit.
 - `ff-crm-mcp-stdio` — stdio↔Streamable-HTTP bridge, so the gateway can be
   registered as an MCP connector.
 
 Stdlib only. No Node, no PyPI dependencies, Python 3.9+.
+
+## Install
+
+`--python 3.12` matters: on a machine with no Python at all, `uvx` otherwise
+fails with `Failed to spawn: python`.
+
+```bash
+# no git, no package index — straight from a release asset
+uvx --python 3.12 --from https://github.com/AlexWolfGoncharov/ff-crm-mcp/releases/download/v0.1.0/ff_crm_mcp-0.1.0-py3-none-any.whl ff-crm-mcp --doctor
+
+# from source, where git is available
+uvx --python 3.12 --from git+https://github.com/AlexWolfGoncharov/ff-crm-mcp ff-crm-mcp-stdio
+```
 
 ## The package ships code only
 
@@ -15,34 +28,33 @@ you:
 
 ```bash
 export CRM_MCP_URL="https://<gateway>/receiver-crm/mcp"
-uvx ff-crm-mcp --list-tools
-uvx ff-crm-mcp --doctor
+ff-crm-mcp --list-tools
+ff-crm-mcp --doctor
 ```
 
 Some gateways present a certificate that does not cover their host. For those,
 and only those, add `CRM_MCP_INSECURE_TLS=1` (or `--insecure`).
 
-If you have a `markets.json` (it lives in the `crm-mcp` skill), point at it and
-use `--market/--env` instead:
+If you have a `markets.json`, point at it and use `--market/--env` instead:
 
 ```bash
-export CRM_MCP_MARKETS=/path/to/crm-mcp/references/markets.json
-uvx ff-crm-mcp --market in --env prod --doctor
+export CRM_MCP_MARKETS=/path/to/markets.json
+ff-crm-mcp --market in --env prod --doctor
 ```
 
 Resolution order: `--url` → `CRM_MCP_URL` → `--market/--env` via markets.json.
 
 ## As a connector
 
-`claude_desktop_config.json` — one entry per market and env, and the name is how
-an agent knows which env it is writing to:
+One entry per market and env — the name is how you (and an agent) know which
+environment a call is writing to:
 
 ```json
 "crm-az-prod": {
   "command": "uvx",
-  "args": ["ff-crm-mcp-stdio"],
+  "args": ["--python", "3.12", "--from", "https://github.com/AlexWolfGoncharov/ff-crm-mcp/releases/download/v0.1.0/ff_crm_mcp-0.1.0-py3-none-any.whl", "ff-crm-mcp-stdio"],
   "env": {
-    "CRM_MCP_URL": "https://<az-prod-gateway>/receiver-crm/mcp",
+    "CRM_MCP_URL": "https://<gateway>/receiver-crm/mcp",
     "CRM_MCP_INSECURE_TLS": "1"
   }
 }
@@ -52,27 +64,34 @@ Restart the client afterwards; MCP servers are read at startup. The bridge
 prints the resolved URL to stderr on start, so the client log shows whether it
 reached the network.
 
-Every gateway is internal: VPN required. `nslookup` and `dig` bypass the macOS
-scoped resolver and will report NXDOMAIN for a host that resolves fine — use
-`ff-crm-mcp --doctor`, which checks DNS through `getaddrinfo`, TCP 443, and a
-real `initialize` + `tools/list`.
+**On Windows, never use `command: npx`** in a connector entry or an `.mcpb`
+manifest: it cannot spawn `npx.cmd` without a shell and dies with ENOENT. `uvx`
+has no such problem.
+
+## Diagnostics
+
+`ff-crm-mcp --doctor` resolves the host through `getaddrinfo`, opens TCP 443,
+then runs a real `initialize` + `tools/list` and reports the tool count. Use it
+before blaming a gateway.
+
+If the gateway is on a private network, note that `nslookup` and `dig` read
+`/etc/resolv.conf` and bypass the macOS scoped resolver — they report NXDOMAIN
+for hosts that applications resolve fine. `--doctor` uses `getaddrinfo`, which
+is what a real client does.
 
 ## Guard rails
 
-`ff-crm-mcp` refuses to create a communication that is not on `pause`, refuses a
-promotional one without a control group ≥2%, and refuses a destructive call
-without an explicit confirmation flag. **A connector enforces none of this** —
-the bridge is transport only. Prefer the CLI where a shell is available.
+`ff-crm-mcp` refuses to create a communication that is not paused, refuses a
+promotional one without a control group, and refuses a destructive call without
+an explicit confirmation flag.
 
-## Install
+**A connector enforces none of that** — the bridge is transport only. Prefer the
+CLI wherever a shell is available.
 
-```bash
-# no git needed — straight from a release asset
-uvx --from https://github.com/AlexWolfGoncharov/ff-crm-mcp/releases/download/v0.1.0/ff_crm_mcp-0.1.0-py3-none-any.whl ff-crm-mcp --doctor
+## Quirks it handles
 
-# or from source, if git is available
-uvx --from git+https://github.com/AlexWolfGoncharov/ff-crm-mcp ff-crm-mcp-stdio
-```
-
-In a connector entry, the whole `--from …` form goes in `args` ahead of the
-command name.
+- **A certificate that does not cover the gateway host.** `--insecure` /
+  `CRM_MCP_INSECURE_TLS=1` for exactly those endpoints.
+- **A gateway that echoes a numeric JSON-RPC id back as a string** (`{"id": 1}`
+  → `{"id": "1"}`). A strict client never matches that reply to its request; the
+  bridge restores the original id and its type.
