@@ -60,6 +60,13 @@ environment a call is writing to:
 }
 ```
 
+**Where `uvx` exists, `uvx fastmcp-remote <url>` is the simpler connector** — add
+`--verify false` for a gateway whose certificate does not cover its host
+(verified 16.09.2026: handshake, tool list and tool calls all fine). This
+package's bridge is for machines with neither `uvx` nor `npx`; the CLI side
+keeps its own value either way — `--doctor` and the write guards have no
+equivalent in a generic bridge.
+
 Restart the client afterwards; MCP servers are read at startup. The bridge
 prints the resolved URL to stderr on start, so the client log shows whether it
 reached the network.
